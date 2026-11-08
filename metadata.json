@@ -1,0 +1,6 @@
+{
+  "name": "Personalised Happy Diwali Wishes",
+  "description": "Send personalised Diwali greeting cards with animated glowing diyas, rangoli, fireworks, interactive festive games, and heartfelt festive blessings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,1954 @@
+﻿PROJECT SOURCE CODE
+FILE: index.html
+========================================
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Personalised Happy Diwali Wishes âœ¨ ðŸª”</title>
+    <meta name="description" content="Send personalized Diwali greeting cards with animated glowing diyas, rangoli, fireworks, and heartfelt festive blessings." />
+    <meta property="og:title" content="Personalised Happy Diwali Wishes âœ¨ ðŸª”" />
+    <meta property="og:description" content="Send personalized Diwali greeting cards with animated glowing diyas, rangoli, fireworks, and heartfelt festive blessings." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;600;700;800;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-[#090212] text-[#fbf5e8] antialiased overflow-x-hidden selection:bg-amber-500/30 selection:text-amber-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+========================================
+
+
+import React, { useState, useEffect } from 'react';
+import {
+  Sparkles,
+  Copy,
+  Check,
+  Send,
+  Eye,
+  Users,
+  User,
+  QrCode,
+  Flame,
+  CheckCircle2,
+  Palette,
+  Shuffle,
+} from 'lucide-react';
+import { FestiveToran } from './FestiveToran';
+import { DesignSelector } from './DesignSelector';
+import { DiwaliFunZone } from './games/DiwaliFunZone';
+import { AboutDiwali } from './AboutDiwali';
+import { DesignThemeId, DIWALI_DESIGNS } from '../types/theme';
+import { festiveAudio } from '../utils/audio';
+
+interface SavedWish {
+  id: string;
+  name: string;
+  sender?: string;
+  design?: DesignThemeId;
+  url: string;
+  createdAt: number;
+}
+
+interface AdminHomeProps {
+  onPreviewCard: (name: string, sender?: string, message?: string, design?: DesignThemeId) => void;
+}
+
+const PRESET_MESSAGES = [
+  {
+    id: 'classic',
+    title: 'Traditional Blessing (Classic)',
+    text: 'May this Diwali bring happiness, prosperity, success and endless blessings into your life. May your home shine with love, laughter and positivity. Wishing you and your family a very Happy Diwali!',
+  },
+  {
+    id: 'prosperity',
+    title: 'Wealth & Prosperity (Lakshmi Blessings)',
+    text: 'On this auspicious festival of lights, may Goddess Lakshmi bless you with abundance, good health, and glorious achievements. Have a blessed and prosperous Happy Diwali!',
+  },
+  {
+    id: 'family',
+    title: 'Warmth, Family & Joy',
+    text: 'May the divine glow of diyas fill your home with warmth, love, and sweet festive moments with family. Wishing you a sparkling and joyous Diwali celebration!',
+  },
+  {
+    id: 'spiritual',
+    title: 'Peace & Inner Light',
+    text: 'Lead from darkness to light, ignorance to knowledge. May the sacred flame of Deepavali ignite inner peace, clarity, and boundless divine grace. Happy Diwali!',
+  },
+];
+
+export const AdminHome: React.FC<AdminHomeProps> = ({ onPreviewCard }) => {
+  const [selectedDesignId, setSelectedDesignId] = useState<DesignThemeId>('royal');
+  const [recipientName, setRecipientName] = useState('');
+  const [senderName, setSenderName] = useState('');
+  const [selectedMessageId, setSelectedMessageId] = useState('classic');
+  const [customMessage, setCustomMessage] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Mode: 'single' | 'batch'
+  const [mode, setMode] = useState<'single' | 'batch'>('single');
+
+  // Batch names
+  const [batchNamesInput, setBatchNamesInput] = useState('');
+  const [batchGeneratedList, setBatchGeneratedList] = useState<
+    Array<{ name: string; url: string; design: DesignThemeId; copied: boolean }>
+  >([]);
+
+  // Local storage history
+  const [history, setHistory] = useState<SavedWish[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('diwali_wishes_history');
+      if (saved) {
+        setHistory(JSON.parse(saved));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const saveToHistory = (name: string, sender: string, url: string, design: DesignThemeId) => {
+    const newEntry: SavedWish = {
+      id: Date.now().toString(),
+      name,
+      sender: sender || undefined,
+      design,
+      url,
+      createdAt: Date.now(),
+    };
+    const updated = [newEntry, ...history.filter((h) => h.name.toLowerCase() !== name.toLowerCase())].slice(0, 15);
+    setHistory(updated);
+    try {
+      localStorage.setItem('diwali_wishes_history', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const getBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}${window.location.pathname}`;
+    }
+    return '';
+  };
+
+  const createWishUrl = (
+    name: string,
+    sender?: string,
+    messageId?: string,
+    customText?: string,
+    designId: DesignThemeId = selectedDesignId
+  ) => {
+    const base = getBaseUrl();
+    const params = new URLSearchParams();
+    params.set('name', name.trim());
+    params.set('theme', designId);
+    params.set('design', designId);
+
+    if (sender && sender.trim()) {
+      params.set('from', sender.trim());
+    }
+    if (messageId === 'custom' && customText && customText.trim()) {
+      params.set('msg', customText.trim());
+    } else if (messageId && messageId !== 'classic') {
+      const preset = PRESET_MESSAGES.find((p) => p.id === messageId);
+      if (preset) {
+        params.set('msg', preset.text);
+      }
+    }
+    return `${base}?${params.toString()}`;
+  };
+
+  const handleGenerateSingle = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!recipientName.trim()) {
+      setErrorMessage('Please enter the personâ€™s name.');
+      return;
+    }
+    setErrorMessage('');
+
+    const url = createWishUrl(recipientName, senderName, selectedMessageId, customMessage, selectedDesignId);
+    setGeneratedLink(url);
+    saveToHistory(recipientName.trim(), senderName.trim(), url, selectedDesignId);
+
+    festiveAudio.playSparklerSound();
+  };
+
+  const handleGenerateBatch = () => {
+    if (!batchNamesInput.trim()) {
+      setErrorMessage('Please enter at least one name.');
+      return;
+    }
+    setErrorMessage('');
+
+    const rawNames = batchNamesInput
+      .split(/[\n,]/)
+      .map((n) => n.trim())
+      .filter((n) => n.length > 0);
+
+    const uniqueNames = Array.from(new Set(rawNames));
+
+    const list = uniqueNames.map((name) => {
+      const url = createWishUrl(name, senderName, selectedMessageId, customMessage, selectedDesignId);
+      saveToHistory(name, senderName.trim(), url, selectedDesignId);
+      return {
+        name,
+        url,
+        design: selectedDesignId,
+        copied: false,
+      };
+    });
+
+    setBatchGeneratedList(list);
+    festiveAudio.playFireworkSound();
+  };
+
+  const copyToClipboard = async (text: string, onDone?: () => void) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (onDone) onDone();
+    } catch {
+      if (onDone) onDone();
+    }
+  };
+
+  const shareViaWhatsApp = (name: string, url: string, designId: DesignThemeId = selectedDesignId) => {
+    const matchedTheme = DIWALI_DESIGNS.find((d) => d.id === designId) || DIWALI_DESIGNS[0];
+    const chosenMsg =
+      selectedMessageId === 'custom' && customMessage.trim()
+        ? customMessage.trim()
+        : PRESET_MESSAGES.find((p) => p.id === selectedMessageId)?.text || matchedTheme.defaultMessage;
+
+    const text = encodeURIComponent(
+      `âœ¨ *Happy Diwali, ${name}!* ðŸª”\n\n${chosenMsg}\n\nðŸŒŸ *Open your special ${matchedTheme.name} card:*\nðŸ‘‰ ${url}\n\n${
+        senderName.trim() ? `With warm blessings,\n- ${senderName.trim()}` : 'Wishing you & your family a joyful Diwali!'
+      }`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
+  const activeTheme = DIWALI_DESIGNS.find((d) => d.id === selectedDesignId) || DIWALI_DESIGNS[0];
+
+  const currentMessageText =
+    selectedMessageId === 'custom'
+      ? customMessage || 'Custom heartfelt message...'
+      : PRESET_MESSAGES.find((p) => p.id === selectedMessageId)?.text || activeTheme.defaultMessage;
+
+  return (
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-start pb-16 z-10">
+      <FestiveToran />
+
+      <main className="w-full max-w-5xl px-4 mt-2">
+        {/* 1. Header Hero (Home Section) */}
+        <section id="home" className="text-center mb-6 pt-2 scroll-mt-20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>Digital Diwali Greeting Card Studio</span>
+          </div>
+
+          <h1
+            className="text-3xl sm:text-5xl font-black tracking-tight font-serif gold-shimmer-text drop-shadow-[0_4px_16px_rgba(245,158,11,0.4)]"
+            style={{ fontFamily: "'Cinzel Decorative', 'Cinzel', serif" }}
+          >
+            Personalised Diwali Wishes
+          </h1>
+          <p className="mt-2 text-sm sm:text-base text-amber-200/80 max-w-2xl mx-auto leading-relaxed">
+            Create an enchanting, interactive greeting link addressed to your loved ones. Choose from 11 distinctive
+            Diwali themes complete with animated diyas, fireworks, and festive music.
+          </p>
+        </section>
+
+        {/* 2. Choose Your Diwali Theme Section */}
+        <section id="choose-theme" className="festive-card-glass rounded-2xl gold-border-glow shadow-2xl p-5 sm:p-7 backdrop-blur-xl mb-8 scroll-mt-20">
+          <DesignSelector
+            selectedDesignId={selectedDesignId}
+            onSelectDesign={(id) => {
+              setSelectedDesignId(id);
+              // Update link if already generated
+              if (recipientName.trim()) {
+                const url = createWishUrl(recipientName, senderName, selectedMessageId, customMessage, id);
+                setGeneratedLink(url);
+              }
+            }}
+            onLivePreviewDesign={(id) => {
+              onPreviewCard(
+                recipientName.trim() || 'Rahul',
+                senderName.trim() || undefined,
+                currentMessageText,
+                id
+              );
+            }}
+          />
+        </section>
+
+        {/* 3. Personalisation Controls & Card Box (Create Wishes Section) */}
+        <section id="create-wishes" className="festive-card-glass rounded-2xl gold-border-glow shadow-2xl p-6 sm:p-8 backdrop-blur-xl mb-8 scroll-mt-20">
+          {/* Mode Selector Tabs (Single vs Multi-Person Batch) */}
+          <div className="flex items-center justify-center mb-6">
+            <div className="p-1 rounded-xl bg-purple-950/70 border border-amber-500/30 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setMode('single')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  mode === 'single'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 shadow-md'
+                    : 'text-amber-300 hover:text-amber-100'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Single Recipient</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode('batch')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  mode === 'batch'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 shadow-md'
+                    : 'text-amber-300 hover:text-amber-100'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Multi-Person Batch</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Form Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Inputs */}
+            <div className="lg:col-span-7 space-y-5">
+              {mode === 'single' ? (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-1.5">
+                    Recipient's Name <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={recipientName}
+                    onChange={(e) => {
+                      setRecipientName(e.target.value);
+                      if (errorMessage) setErrorMessage('');
+                    }}
+                    placeholder="e.g. Rahul, Sneha, Uncle & Aunty..."
+                    className="w-full px-4 py-3 rounded-xl bg-[#0e041c] border border-amber-500/40 text-amber-100 placeholder-amber-400/40 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm transition-all"
+                  />
+                  {errorMessage && <p className="text-xs text-rose-400 mt-1 font-medium">{errorMessage}</p>}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-1.5">
+                    Recipient Names (Comma or New Line separated) <span className="text-rose-400">*</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={batchNamesInput}
+                    onChange={(e) => {
+                      setBatchNamesInput(e.target.value);
+                      if (errorMessage) setErrorMessage('');
+                    }}
+                    placeholder="Rahul, Priya, Amit, Uncle & Aunty, Vikram..."
+                    className="w-full px-4 py-3 rounded-xl bg-[#0e041c] border border-amber-500/40 text-amber-100 placeholder-amber-400/40 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm transition-all resize-none"
+                  />
+                  {errorMessage && <p className="text-xs text-rose-400 mt-1 font-medium">{errorMessage}</p>}
+                </div>
+              )}
+
+              {/* Sender Name */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-1.5">
+                  Your Name (Sender) <span className="text-amber-400/60 font-normal lowercase">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  placeholder="e.g. Ankit, The Sharma Family..."
+                  className="w-full px-4 py-3 rounded-xl bg-[#0e041c] border border-amber-500/40 text-amber-100 placeholder-amber-400/40 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm transition-all"
+                />
+              </div>
+
+              {/* Message Preset Selector */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
+                  Select Diwali Message
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PRESET_MESSAGES.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setSelectedMessageId(preset.id)}
+                      className={`p-3 rounded-xl text-left border text-xs transition-all ${
+                        selectedMessageId === preset.id
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-100 font-medium ring-1 ring-amber-400/50'
+                          : 'bg-[#0e041c]/70 border-amber-500/20 text-amber-300/80 hover:border-amber-400/40'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Flame
+                          className={`w-3.5 h-3.5 ${
+                            selectedMessageId === preset.id ? 'text-amber-400' : 'text-amber-600'
+                          }`}
+                        />
+                        <span className="font-semibold text-amber-200">{preset.title}</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/60 line-clamp-2 leading-relaxed">{preset.text}</p>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMessageId('custom')}
+                    className={`text-xs flex items-center gap-1.5 ${
+                      selectedMessageId === 'custom'
+                        ? 'text-amber-300 font-semibold underline'
+                        : 'text-amber-400/70 hover:text-amber-300'
+                    }`}
+                  >
+                    <span>Or write a custom personal wish</span>
+                  </button>
+                  {selectedMessageId === 'custom' && (
+                    <textarea
+                      rows={3}
+                      value={customMessage}
+                      onChange={(e) => setCustomMessage(e.target.value)}
+                      placeholder="Type your heartfelt Diwali wish here..."
+                      className="mt-2 w-full px-3.5 py-2.5 rounded-xl bg-[#0e041c] border border-amber-500/40 text-amber-100 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400 transition-all resize-none"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Generate Action Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={mode === 'single' ? () => handleGenerateSingle() : handleGenerateBatch}
+                  className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-stone-950 font-bold text-sm tracking-wide shadow-xl shadow-amber-500/20 hover:shadow-amber-400/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4 fill-stone-950" />
+                  <span>
+                    {mode === 'single' ? `Generate ${activeTheme.name} Link âœ¨` : 'Generate All Wish Links âœ¨'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: Live Card Preview & Share Hub */}
+            <div className="lg:col-span-5 flex flex-col items-center">
+              <div className="w-full text-left mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-amber-300">
+                  Card Preview ({activeTheme.name})
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onPreviewCard(
+                      recipientName.trim() || 'Rahul',
+                      senderName.trim() || undefined,
+                      currentMessageText,
+                      selectedDesignId
+                    )
+                  }
+                  className="text-xs text-amber-400 hover:text-amber-200 flex items-center gap-1 font-medium"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Full Screen Preview</span>
+                </button>
+              </div>
+
+              {/* Dynamic Theme Preview Card */}
+              <div className="w-full rounded-2xl border border-amber-500/40 shadow-inner relative overflow-hidden flex flex-col items-center text-center">
+                {/* Background image preview */}
+                <div className="relative w-full h-32 overflow-hidden">
+                  <img
+                    src={activeTheme.thumbnail}
+                    alt={activeTheme.name}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover filter brightness-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0e041c] via-[#0e041c]/50 to-transparent" />
+                  <div className="absolute top-2 left-3 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] text-amber-300 border border-amber-400/30">
+                    Theme: {activeTheme.name}
+                  </div>
+                </div>
+
+                <div className="p-4 w-full bg-[#0e041c] flex flex-col items-center">
+                  <div className="text-amber-300 font-serif text-lg sm:text-xl font-bold tracking-tight gold-gradient-text">
+                    Happy Diwali, {recipientName.trim() || 'Rahul'}! ðŸª”
+                  </div>
+
+                  {senderName.trim() && (
+                    <p className="text-[11px] text-amber-300/80 mt-0.5">From {senderName.trim()}</p>
+                  )}
+
+                  <p className="text-xs text-amber-100/90 italic font-sans leading-relaxed line-clamp-3 px-2 mt-2">
+                    "{currentMessageText}"
+                  </p>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Animated Diya
+                    </span>
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Fireworks
+                    </span>
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Music
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Generated Single Link Box */}
+              {generatedLink && mode === 'single' && (
+                <div className="w-full mt-5 p-4 rounded-xl bg-purple-950/60 border border-amber-400/50 shadow-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      Link Generated for {recipientName}!
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQR(!showQR)}
+                      className="text-[11px] text-amber-400 hover:text-amber-200 flex items-center gap-1 font-medium"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>{showQR ? 'Hide QR' : 'Show QR'}</span>
+                    </button>
+                  </div>
+
+                  {/* URL Text Container */}
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0a0214] border border-amber-500/30">
+                    <input
+                      type="text"
+                      readOnly
+                      value={generatedLink}
+                      className="w-full bg-transparent text-xs text-amber-200 truncate focus:outline-none select-all font-mono"
+                    />
+                  </div>
+
+                  {/* Actions: Copy Link & WhatsApp Share */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(generatedLink, () => {
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        })
+                      }
+                      className="w-full py-2.5 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-300">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => shareViaWhatsApp(recipientName, generatedLink, selectedDesignId)}
+                      className="w-full py-2.5 px-3 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </button>
+                  </div>
+
+                  {/* QR Code view */}
+                  {showQR && (
+                    <div className="pt-2 flex flex-col items-center">
+                      <div className="p-3 bg-white rounded-xl shadow-lg">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+                            generatedLink
+                          )}`}
+                          alt="Diwali Wish QR Code"
+                          className="w-32 h-32"
+                        />
+                      </div>
+                      <span className="text-[11px] text-amber-300/70 mt-1">Scan with phone to open greeting</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Batch Generated Links Table */}
+          {mode === 'batch' && batchGeneratedList.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-amber-500/20">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-amber-200">
+                  Generated Links ({batchGeneratedList.length} Recipients Â· {activeTheme.name})
+                </h3>
+                <span className="text-xs text-amber-400/80">1-click WhatsApp or Copy for each</span>
+              </div>
+
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {batchGeneratedList.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl bg-purple-950/40 border border-amber-500/20 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="truncate min-w-0">
+                      <span className="font-semibold text-amber-200">{item.name}</span>
+                      <p className="text-[11px] text-amber-400/60 truncate">{item.url}</p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(item.url, () => {
+                            const updated = [...batchGeneratedList];
+                            updated[idx].copied = true;
+                            setBatchGeneratedList(updated);
+                            setTimeout(() => {
+                              const reset = [...batchGeneratedList];
+                              if (reset[idx]) reset[idx].copied = false;
+                              setBatchGeneratedList(reset);
+                            }, 2000);
+                          })
+                        }
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium"
+                      >
+                        {item.copied ? 'Copied' : 'Copy'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => shareViaWhatsApp(item.name, item.url, item.design)}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-medium flex items-center gap-1"
+                      >
+                        <Send className="w-3 h-3" />
+                        <span>Share</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Recently Generated History with Design Badges */}
+        {history.length > 0 && (
+          <div className="mt-10 p-5 rounded-2xl festive-card-glass border border-amber-500/30">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Recently Created Greetings</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setHistory([]);
+                  localStorage.removeItem('diwali_wishes_history');
+                }}
+                className="text-[11px] text-amber-400/60 hover:text-rose-400 transition-colors"
+              >
+                Clear History
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {history.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 rounded-xl bg-[#0d0319] border border-amber-500/20 flex flex-col justify-between gap-2"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-amber-200 truncate">{item.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 capitalize border border-amber-500/25">
+                        {item.design || 'royal'}
+                      </span>
+                    </div>
+                    {item.sender && (
+                      <p className="text-[11px] text-amber-300/70">From {item.sender}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-amber-500/10">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(item.url, () => {
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        })
+                      }
+                      className="flex-1 py-1 px-2 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] text-center"
+                    >
+                      Copy Link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shareViaWhatsApp(item.name, item.url, item.design || 'royal')}
+                      className="p-1.5 rounded bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100"
+                      title="Share to WhatsApp"
+                    >
+                      <Send className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4. Diwali Fun Zone Section */}
+        <div className="mt-12">
+          <DiwaliFunZone />
+        </div>
+
+        {/* 5. About Diwali Cultural Section */}
+        <div className="mt-8">
+          <AboutDiwali />
+        </div>
+      </main>
+    </div>
+  );
+};
+
+import React from 'react';
+
+interface AnimatedRangoliProps {
+  size?: number;
+  className?: string;
+  isLit?: boolean;
+}
+
+export const AnimatedRangoli: React.FC<AnimatedRangoliProps> = ({
+  size = 380,
+  className = '',
+  isLit = true,
+}) => {
+  return (
+    <div
+      className={`relative flex items-center justify-center select-none pointer-events-none ${className}`}
+      style={{ width: size, height: size }}
+    >
+      {/* Outer ambient glow */}
+      <div
+        className={`absolute inset-0 rounded-full transition-all duration-1000 ${
+          isLit
+            ? 'bg-radial from-amber-500/25 via-amber-700/10 to-transparent blur-2xl scale-125'
+            : 'bg-radial from-amber-900/15 via-transparent to-transparent blur-xl scale-100'
+        }`}
+      />
+
+      {/* Rotating intricate Rangoli Mandala SVG */}
+      <svg
+        viewBox="0 0 400 400"
+        className="w-full h-full animate-rangoli-spin origin-center"
+        style={{
+          filter: isLit
+            ? 'drop-shadow(0 0 12px rgba(245, 158, 11, 0.45))'
+            : 'drop-shadow(0 0 5px rgba(217, 119, 6, 0.2))',
+          transition: 'filter 1s ease',
+        }}
+      >
+        <defs>
+          <linearGradient id="goldGradientRangoli" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fef08a" />
+            <stop offset="30%" stopColor="#fbbf24" />
+            <stop offset="70%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#d97706" />
+          </linearGradient>
+
+          <linearGradient id="rubyGradientRangoli" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f43f5e" />
+            <stop offset="100%" stopColor="#9f1239" />
+          </linearGradient>
+
+          <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fde047" stopOpacity="0.8" />
+            <stop offset="60%" stopColor="#f59e0b" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+
+        {/* Outer concentric rings */}
+        <circle cx="200" cy="200" r="190" fill="none" stroke="url(#goldGradientRangoli)" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
+        <circle cx="200" cy="200" r="178" fill="none" stroke="url(#goldGradientRangoli)" strokeWidth="1.5" opacity="0.8" />
+        <circle cx="200" cy="200" r="162" fill="none" stroke="url(#rubyGradientRangoli)" strokeWidth="2" opacity="0.7" />
+
+        {/* 16 Outer Decorative Lotus Petals */}
+        {Array.from({ length: 16 }).map((_, i) => {
+          const angle = (i * 360) / 16;
+          return (
+            <g key={`outer-petal-${i}`} transform={`rotate(${angle} 200 200)`}>
+              <path
+                d="M 200 22 C 185 60 175 105 200 135 C 225 105 215 60 200 22 Z"
+                fill="url(#goldGradientRangoli)"
+                fillOpacity="0.12"
+                stroke="url(#goldGradientRangoli)"
+                strokeWidth="1.2"
+              />
+              <circle cx="200" cy="24" r="3.5" fill="#fde047" />
+              <path
+                d="M 200 45 C 193 65 190 90 200 110 C 210 90 207 65 200 45 Z"
+                fill="url(#rubyGradientRangoli)"
+                fillOpacity="0.25"
+                stroke="url(#rubyGradientRangoli)"
+                strokeWidth="0.8"
+              />
+            </g>
+          );
+        })}
+
+        {/* Middle circular filigree band */}
+        <circle cx="200" cy="200" r="128" fill="none" stroke="url(#goldGradientRangoli)" strokeWidth="1.5" />
+        <circle cx="200" cy="200" r="118" fill="none" stroke="url(#goldGradientRangoli)" strokeWidth="0.8" strokeDasharray="2 3" />
+
+        {/* 8 Sacred Diya holder motifs in middle ring */}
+        {Array.from({ length: 8 }).map((_, i) => {
+          const angle = (i * 360) / 8 + 22.5;
+          return (
+            <g key={`mid-motif-${i}`} transform={`rotate(${angle} 200 200)`}>
+              <path
+                d="M 200 80 C 180 100 185 125 200 130 C 215 125 220 100 200 80 Z"
+                fill="none"
+                stroke="url(#goldGradientRangoli)"
+                strokeWidth="1.5"
+              />
+              <circle cx="200" cy="95" r="4" fill="#fbbf24" opacity="0.9" />
+              <line x1="200" y1="70" x2="200" y2="80" stroke="url(#goldGradientRangoli)" strokeWidth="1.5" />
+            </g>
+          );
+        })}
+
+        {/* Inner 8-point geometric star */}
+        <polygon
+          points="200,90 225,145 285,145 238,180 256,238 200,205 144,238 162,180 115,145 175,145"
+          fill="none"
+          stroke="url(#goldGradientRangoli)"
+          strokeWidth="1.2"
+          opacity="0.75"
+        />
+        <polygon
+          points="200,90 225,145 285,145 238,180 256,238 200,205 144,238 162,180 115,145 175,145"
+          transform="rotate(22.5 200 200)"
+          fill="none"
+          stroke="url(#rubyGradientRangoli)"
+          strokeWidth="0.9"
+          opacity="0.6"
+        />
+
+        {/* Inner lotus ring */}
+        <circle cx="200" cy="200" r="55" fill="none" stroke="url(#goldGradientRangoli)" strokeWidth="1.5" />
+        <circle cx="200" cy="200" r="45" fill="url(#centerGlow)" />
+
+        {/* Sacred Om or Floral center core */}
+        {Array.from({ length: 8 }).map((_, i) => {
+          const angle = (i * 360) / 8;
+          return (
+            <path
+              key={`inner-petal-${i}`}
+              d="M 200 160 C 192 175 192 185 200 190 C 208 185 208 175 200 160 Z"
+              fill="url(#goldGradientRangoli)"
+              transform={`rotate(${angle} 200 200)`}
+              opacity="0.85"
+            />
+          );
+        })}
+        <circle cx="200" cy="200" r="7" fill="#fef08a" />
+      </svg>
+    </div>
+  );
+};
+
+========================================
+import React, { useState } from 'react';
+import { Sparkles, Send, Copy, Check, RotateCcw, Flower2, Moon } from 'lucide-react';
+import { InteractiveDiya } from '../InteractiveDiya';
+import { festiveAudio } from '../../utils/audio';
+
+interface DesignCardProps {
+  recipientName: string;
+  senderName?: string;
+  customMessage?: string;
+  isDiyaLit: boolean;
+  onToggleDiya: () => void;
+  onTriggerSurprise: () => void;
+  onReplayAnimation: () => void;
+  onOpenGames?: () => void;
+  currentUrl: string;
+}
+
+export const DesignGarden: React.FC<DesignCardProps> = ({
+  recipientName,
+  senderName,
+  customMessage,
+  isDiyaLit,
+  onToggleDiya,
+  onTriggerSurprise,
+  onReplayAnimation,
+  currentUrl,
+}) => {
+  const [copied, setCopied] = useState(false);
+
+  const defaultMsg =
+    'Under a gentle moonlit sky, may the sweet fragrance of night-blooming jasmine and the warmth of twinkling garden lanterns bring peace, love, and serene joy to your heart. Happy Diwali!';
+
+  const messageText = customMessage?.trim() || defaultMsg;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(currentUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleWhatsApp = () => {
+    const text = encodeURIComponent(
+      `ðŸŒ¿ *Happy Diwali, ${recipientName}!* ðŸ¦‹ðŸŒ¸\n\n${messageText}\n\nðŸ® *Open your Dream Garden Diwali Greeting:*\nðŸ‘‰ ${currentUrl}\n\n${
+        senderName ? `With fragrant wishes,\n- ${senderName}` : 'Wishing you peace & blossoming joy!'
+      }`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
+  return (
+    <div className="relative w-full flex flex-col items-center justify-between pb-8 pt-4 px-4 overflow-hidden">
+      {/* Background Fairytale Garden Backdrop */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <img
+          src="/src/assets/images/theme_dream_garden_1794111573896.jpg"
+          alt="Dream Garden Diwali"
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover opacity-35 filter saturate-125 brightness-95"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#061811]/90 via-[#0a2318]/85 to-[#04100c]/95" />
+      </div>
+
+      {/* Floating Butterflies & Jasmine Petals */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {['ðŸ¦‹', 'ðŸŒ¸', 'âœ¨', 'ðŸŒ¼', 'ðŸ¦‹', 'ðŸŒ¿'].map((item, idx) => (
+          <span
+            key={idx}
+            className="absolute text-xl sm:text-2xl animate-float-slow opacity-75"
+            style={{
+              left: `${10 + idx * 16}%`,
+              top: `${18 + (idx % 3) * 26}%`,
+              animationDuration: `${6 + (idx % 3) * 2}s`,
+              animationDelay: `${idx * 0.5}s`,
+            }}
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+
+      {/* Top Garden Bar */}
+      <div className="relative z-10 w-full max-w-2xl flex items-center justify-between px-4 py-2 border-b border-emerald-500/25 text-emerald-200 text-xs">
+        <div className="flex items-center gap-2">
+          <Moon className="w-3.5 h-3.5 text-emerald-300" />
+          <span className="font-serif tracking-widest uppercase text-[11px]">Enchanted Garden Glade</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-emerald-300/80 font-serif text-[11px]">
+          <Flower2 className="w-3 h-3 text-amber-300" />
+          <span>Jasmine & Lantern Glow</span>
+        </div>
+      </div>
+
+      {/* Main Garden Card */}
+      <main className="relative z-10 w-full max-w-2xl mx-auto flex flex-col items-center text-center my-4 animate-float-slow">
+        {/* Subtitle */}
+        <div className="mb-1">
+          <span className="text-xs uppercase tracking-[0.25em] text-emerald-300 font-serif font-semibold">
+            Fairytale Lanterns Â· Fragrant Jasmine
+          </span>
+        </div>
+
+        {/* Personalized Main Headline */}
+        <div className="relative py-2 px-4 max-w-xl">
+          <h1
+            className="text-3xl sm:text-5xl md:text-6xl font-normal tracking-wide leading-tight font-serif text-[#ecfdf5] drop-shadow-md"
+            style={{ fontFamily: "'Cinzel', serif" }}
+          >
+            Happy Diwali,{' '}
+            <span className="text-emerald-300 font-semibold underline decoration-amber-400 decoration-wavy underline-offset-8">
+              {recipientName}
+            </span>
+            ! ðŸ¦‹
+          </h1>
+
+          {senderName && (
+            <p className="mt-2 text-sm sm:text-base text-emerald-200/90 font-serif">
+              Wishes blossoming from <span className="text-amber-300 font-bold">{senderName}</span>
+            </p>
+          )}
+        </div>
+
+        {/* Centerpiece Diya with Garden Glow */}
+        <div className="relative w-full flex items-center justify-center my-2">
+          <div className="absolute w-72 h-72 rounded-full bg-radial from-emerald-500/20 via-amber-500/10 to-transparent blur-3xl pointer-events-none" />
+          <div className="relative z-20">
+            <InteractiveDiya
+              isLit={isDiyaLit}
+              onToggleLight={onToggleDiya}
+              recipientName={recipientName}
+            />
+          </div>
+        </div>
+
+        {/* Garden Glass Blessing Card */}
+        <div className="w-full max-w-lg mt-3 p-6 sm:p-7 rounded-2xl bg-gradient-to-b from-[#0d2a1d]/90 to-[#06170f]/95 backdrop-blur-xl border border-emerald-400/40 shadow-[0_0_35px_rgba(16,185,129,0.25)] relative overflow-hidden text-center">
+          <span className="absolute top-2.5 left-3 text-emerald-300 text-sm">ðŸ¦‹</span>
+          <span className="absolute top-2.5 right-3 text-amber-300 text-sm">ðŸ®</span>
+          <span className="absolute bottom-2.5 left-3 text-amber-300 text-sm">ðŸ®</span>
+          <span className="absolute bottom-2.5 right-3 text-emerald-300 text-sm">ðŸ¦‹</span>
+
+          <blockquote className="text-base sm:text-lg text-emerald-50 leading-relaxed font-serif font-light italic">
+            "{messageText}"
+          </blockquote>
+
+          <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent mx-auto my-4" />
+
+          <p className="text-xs text-emerald-300/80 font-serif">
+            Serenity Â· Sweet Fragrance Â· Pure Light
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mt-6 w-full max-w-md">
+          <button
+            onClick={() => {
+              onTriggerSurprise();
+              festiveAudio.playFireworkSound();
+            }}
+            className="flex-1 min-w-[170px] px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-300 text-stone-950 font-bold text-sm shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 fill-stone-950" />
+            <span className="whitespace-nowrap">Garden Fireworks! ðŸŽ†</span>
+          </button>
+
+          <button
+            onClick={handleWhatsApp}
+            className="px-4 py-3 rounded-xl bg-emerald-800 hover:bg-emerald-700 border border-emerald-400/40 text-emerald-100 font-semibold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Send className="w-4 h-4" />
+            <span className="whitespace-nowrap">WhatsApp</span>
+          </button>
+
+          <button
+            onClick={handleCopy}
+            className="px-4 py-3 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 font-medium text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {copied ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-300" />
+                <span className="whitespace-nowrap text-emerald-300">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 text-emerald-300" />
+                <span className="whitespace-nowrap">Copy Link</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={onReplayAnimation}
+            className="px-3.5 py-3 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            title="Replay Celebration"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Replay</span>
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+
+
+========================================
+import React from 'react';
+
+export const FestiveToran: React.FC = () => {
+  return (
+    <div className="w-full pointer-events-none select-none relative overflow-hidden h-14 sm:h-20 flex justify-between items-start px-2 sm:px-6">
+      {/* Top hanging thread */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600 shadow-sm" />
+
+      {/* Repeating scallops with marigold and golden bells */}
+      {Array.from({ length: 9 }).map((_, index) => {
+        const isCenter = index === 4;
+        const delay = (index % 4) * 0.4;
+        return (
+          <div
+            key={index}
+            className="flex flex-col items-center animate-float-slow"
+            style={{ animationDelay: `${delay}s`, animationDuration: `${4 + (index % 3)}s` }}
+          >
+            {/* Scallop arch */}
+            <div className="w-8 sm:w-16 h-4 sm:h-6 border-b-2 border-amber-400/80 rounded-b-full shadow-amber-400/30" />
+
+            {/* Marigold flower clusters */}
+            <div className="flex -space-x-1 -mt-1">
+              <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-gradient-to-tr from-orange-600 to-amber-400 shadow-sm" />
+              <span className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-gradient-to-tr from-yellow-500 to-amber-300 shadow-sm" />
+            </div>
+
+            {/* Hanging golden bell or mango leaf */}
+            <div className="w-0.5 h-3 sm:h-5 bg-amber-400/70" />
+            {isCenter ? (
+              <div className="w-3.5 h-4 sm:w-5 sm:h-6 bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-600 rounded-b-lg shadow-md border border-amber-200 flex items-center justify-center">
+                <span className="w-1 h-1 bg-amber-950 rounded-full" />
+              </div>
+            ) : (
+              <div className="w-2 h-3.5 sm:w-3 sm:h-5 bg-gradient-to-b from-emerald-700 to-emerald-500 rounded-b-full shadow-sm" />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+
+
+FILE: src\components\games\CatchLaddooGame.tsx
+import React, { useState } from 'react';
+import {
+  Gamepad2,
+  Flame,
+  Brain,
+  HelpCircle,
+  Puzzle,
+  Cookie,
+  Zap,
+  ArrowLeft,
+  Search,
+  Palette,
+} from 'lucide-react';
+import { DiyaLightingGame } from './DiyaLightingGame';
+import { MemoryMatchGame } from './MemoryMatchGame';
+import { DiwaliQuizGame } from './DiwaliQuizGame';
+import { RangoliPuzzleGame } from './RangoliPuzzleGame';
+import { CatchLaddooGame } from './CatchLaddooGame';
+import { FireworkReactionGame } from './FireworkReactionGame';
+import { DiwaliTreasureHuntGame } from './DiwaliTreasureHuntGame';
+import { BuildRangoliGame } from './BuildRangoliGame';
+import { festiveAudio } from '../../utils/audio';
+
+type GameId =
+  | 'diya'
+  | 'memory'
+  | 'quiz'
+  | 'rangoli'
+  | 'laddoo'
+  | 'reaction'
+  | 'treasure'
+  | 'builder'
+  | null;
+
+interface GameMeta {
+  id: NonNullable<GameId>;
+  title: string;
+  category: string;
+  tagline: string;
+  icon: React.ReactNode;
+  accent: string;
+  badge: string;
+}
+
+const GAMES_LIST: GameMeta[] = [
+  {
+    id: 'diya',
+    title: 'Diya Lighting Challenge',
+    category: 'Speed & Reflexes',
+    tagline: 'Kindle as many sacred diyas as possible within 30 seconds!',
+    icon: <Flame className="w-6 h-6 text-orange-400" />,
+    accent: 'from-amber-600 to-orange-500',
+    badge: '30s Timer',
+  },
+  {
+    id: 'memory',
+    title: 'Diwali Memory Match',
+    category: 'Memory & Focus',
+    tagline: 'Flip cards and find pairs of golden diyas, sweets & fireworks.',
+    icon: <Brain className="w-6 h-6 text-purple-400" />,
+    accent: 'from-purple-600 to-indigo-500',
+    badge: '6 Pairs',
+  },
+  {
+    id: 'quiz',
+    title: 'Crack the Diwali Quiz',
+    category: 'Heritage & Trivia',
+    tagline: '10 cultural questions on Diwali mythology, rituals & traditions.',
+    icon: <HelpCircle className="w-6 h-6 text-emerald-400" />,
+    accent: 'from-emerald-600 to-teal-500',
+    badge: '10 Questions',
+  },
+  {
+    id: 'rangoli',
+    title: 'Rangoli Pattern Puzzle',
+    category: 'Visual Puzzle',
+    tagline: 'Swap colourful tiles to restore the sacred festive rangoli.',
+    icon: <Puzzle className="w-6 h-6 text-pink-400" />,
+    accent: 'from-pink-600 to-rose-500',
+    badge: '2x2 & 3x3',
+  },
+  {
+    id: 'laddoo',
+    title: 'Catch the Laddoo!',
+    category: 'Arcade Fun',
+    tagline: 'Catch falling sweets with your basket; avoid firecracker bombs!',
+    icon: <Cookie className="w-6 h-6 text-yellow-400" />,
+    accent: 'from-yellow-600 to-amber-500',
+    badge: 'Action Arcade',
+  },
+  {
+    id: 'reaction',
+    title: 'Firework Reaction Challenge',
+    category: 'Reflex Speed',
+    tagline: 'Tap bursting fireworks before they fade to measure your speed!',
+    icon: <Zap className="w-6 h-6 text-cyan-400" />,
+    accent: 'from-cyan-600 to-blue-500',
+    badge: 'Speed Test',
+  },
+  {
+    id: 'treasure',
+    title: 'Diwali Treasure Hunt',
+    category: 'Exploration & Clues',
+    tagline: 'Search the royal palace to uncover 8 sacred hidden Diwali treasures!',
+    icon: <Search className="w-6 h-6 text-amber-400" />,
+    accent: 'from-amber-600 to-yellow-500',
+    badge: '8 Hidden Items',
+  },
+  {
+    id: 'builder',
+    title: 'Build Your Own Rangoli',
+    category: 'Art & Creativity',
+    tagline: 'Draw sacred mandalas with colorful powders, stamps, and save as PNG!',
+    icon: <Palette className="w-6 h-6 text-fuchsia-400" />,
+    accent: 'from-fuchsia-600 to-pink-500',
+    badge: 'Art Canvas',
+  },
+];
+
+interface DiwaliFunZoneProps {
+  onBackToGreeting?: () => void;
+  titlePrefix?: string;
+}
+
+export const DiwaliFunZone: React.FC<DiwaliFunZoneProps> = ({ onBackToGreeting, titlePrefix }) => {
+  const [activeGame, setActiveGame] = useState<GameId>(null);
+
+  const handleSelectGame = (id: NonNullable<GameId>) => {
+    setActiveGame(id);
+    festiveAudio.playDiyaLightSound();
+  };
+
+  return (
+    <section id="fun-zone" className="w-full max-w-5xl mx-auto px-4 py-8 relative z-10 scroll-mt-20">
+      {/* Fun Zone Section Header */}
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold mb-2">
+          <Gamepad2 className="w-4 h-4 text-amber-400" />
+          <span>Diwali Fun Zone Â· 8 Playable Festive Games</span>
+        </div>
+        <h2
+          className="text-2xl sm:text-4xl font-extrabold text-amber-100 font-serif gold-shimmer-text"
+          style={{ fontFamily: "'Cinzel', serif" }}
+        >
+          {titlePrefix ? `${titlePrefix} Play Diwali Games!` : 'Play Diwali Games'}
+        </h2>
+        <p className="text-xs sm:text-sm text-amber-200/70 max-w-xl mx-auto mt-1">
+          Enjoy 8 festive challenges: Diya lighting, treasure hunt, memory match, rangoli making, and arcade fun!
+        </p>
+
+        {onBackToGreeting && (
+          <div className="mt-4">
+            <button
+              onClick={onBackToGreeting}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-950/80 border border-amber-400/40 text-amber-300 text-xs font-bold shadow-md hover:bg-purple-900 active:scale-95 transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Scroll Up to My Personalised Greeting</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Game Interface or Selector Grid */}
+      {activeGame ? (
+        <div className="w-full flex flex-col items-center">
+          {/* Back button to Games list */}
+          <div className="w-full max-w-xl flex justify-start mb-4">
+            <button
+              onClick={() => setActiveGame(null)}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-black/40 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:border-amber-400 transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>â† Back to All 8 Games</span>
+            </button>
+          </div>
+
+          {activeGame === 'diya' && <DiyaLightingGame />}
+          {activeGame === 'memory' && <MemoryMatchGame />}
+          {activeGame === 'quiz' && <DiwaliQuizGame />}
+          {activeGame === 'rangoli' && <RangoliPuzzleGame />}
+          {activeGame === 'laddoo' && <CatchLaddooGame />}
+          {activeGame === 'reaction' && <FireworkReactionGame />}
+          {activeGame === 'treasure' && <DiwaliTreasureHuntGame />}
+          {activeGame === 'builder' && <BuildRangoliGame />}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {GAMES_LIST.map((game) => (
+            <div
+              key={game.id}
+              onClick={() => handleSelectGame(game.id)}
+              className="group p-4 sm:p-5 rounded-2xl festive-card-glass border border-amber-500/25 hover:border-amber-400/60 shadow-xl hover:shadow-[0_0_25px_rgba(245,158,11,0.25)] transition-all duration-300 cursor-pointer flex flex-col justify-between hover:scale-[1.02]"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-amber-500/30 group-hover:scale-110 transition-transform">
+                    {game.icon}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                    {game.badge}
+                  </span>
+                </div>
+
+                <span className="text-[10px] text-amber-400/80 font-serif uppercase tracking-widest block mb-0.5">
+                  {game.category}
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-amber-100 group-hover:text-amber-300 transition-colors">
+                  {game.title}
+                </h3>
+                <p className="text-xs text-amber-200/70 mt-1 leading-relaxed line-clamp-2">{game.tagline}</p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-amber-500/15 flex items-center justify-between">
+                <span className="text-xs font-semibold text-amber-300 group-hover:underline">Play Now</span>
+                <span className="text-amber-400 text-sm group-hover:translate-x-1 transition-transform">â†’</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
+import React, { useState, useEffect } from 'react';
+import { Trophy, Timer, RotateCcw, Search, Sparkles, HelpCircle, CheckCircle2 } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { festiveAudio } from '../../utils/audio';
+
+interface HiddenItem {
+  id: string;
+  name: string;
+  emoji: string;
+  x: number; // percentage left
+  y: number; // percentage top
+  found: boolean;
+  clue: string;
+}
+
+const INITIAL_ITEMS: Omit<HiddenItem, 'found'>[] = [
+  { id: 'diya', name: 'Golden Diya', emoji: 'ðŸª”', x: 28, y: 72, clue: 'Near the center temple doorstep' },
+  { id: 'laddoo', name: 'Besan Laddoo', emoji: 'ðŸ¬', x: 74, y: 64, clue: 'Resting on the right sweets thali' },
+  { id: 'coin', name: 'Lakshmi Gold Coin', emoji: 'ðŸª™', x: 49, y: 46, clue: 'Shining near the central altar pillar' },
+  { id: 'gift', name: 'Diwali Gift Box', emoji: 'ðŸŽ', x: 84, y: 78, clue: 'Tucked into the lower right corner' },
+  { id: 'lantern', name: 'Sky Lantern', emoji: 'ðŸ®', x: 18, y: 22, clue: 'Hanging from the upper left balcony arch' },
+  { id: 'flower', name: 'Marigold Blossom', emoji: 'ðŸŒº', x: 38, y: 84, clue: 'Woven into the bottom rangoli garland' },
+  { id: 'tile', name: 'Rangoli Tile', emoji: 'ðŸŒ¸', x: 62, y: 32, clue: 'Beside the ornate upper right wall pillar' },
+  { id: 'bell', name: 'Temple Bell', emoji: 'ðŸ””', x: 80, y: 18, clue: 'Suspended high beneath the right ceiling arch' },
+];
+
+export const DiwaliTreasureHuntGame: React.FC = () => {
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  // Initialize with all items so inventory is visible immediately
+  const [items, setItems] = useState<HiddenItem[]>(() =>
+    INITIAL_ITEMS.map((item) => ({ ...item, found: false }))
+  );
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(45);
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [isWon, setIsWon] = useState(false);
+  const [activeClue, setActiveClue] = useState<string | null>(null);
+
+  const initGame = (diff = difficulty) => {
+    setDifficulty(diff);
+    const duration = diff === 'easy' ? 60 : diff === 'medium' ? 45 : 30;
+    setTimeLeft(duration);
+    setItems(INITIAL_ITEMS.map((item) => ({ ...item, found: false })));
+    setIsPlaying(true);
+    setIsGameOver(false);
+    setIsWon(false);
+    setActiveClue(null);
+    festiveAudio.playDiyaLightSound();
+  };
+
+  // Timer loop
+  useEffect(() => {
+    let interval: number;
+    if (isPlaying && timeLeft > 0 && !isWon) {
+      interval = window.setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setIsPlaying(false);
+            setIsGameOver(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, [isPlaying, timeLeft, isWon]);
+
+  const handleItemClick = (id: string) => {
+    if (!isPlaying || isWon) return;
+
+    const target = items.find((i) => i.id === id);
+    if (!target || target.found) return; // Prevent double clicks on found items
+
+    setItems((prev) => {
+      const updated = prev.map((item) => (item.id === id ? { ...item, found: true } : item));
+      const foundCount = updated.filter((item) => item.found).length;
+
+      festiveAudio.playSparklerSound();
+
+      if (foundCount === updated.length) {
+        setIsWon(true);
+        setIsPlaying(false);
+        festiveAudio.playFireworkSound();
+        confetti({
+          particleCount: 120,
+          spread: 100,
+          origin: { y: 0.6 },
+        });
+      }
+
+      return updated;
+    });
+  };
+
+  const showNextClue = () => {
+    const unfound = items.filter((item) => !item.found);
+    if (unfound.length > 0) {
+      const randomItem = unfound[Math.floor(Math.random() * unfound.length)];
+      setActiveClue(`Hint for ${randomItem.name}: ${randomItem.clue}`);
+      festiveAudio.playDiyaLightSound();
+    }
+  };
+
+  const foundCount = items.filter((i) => i.found).length;
+
+  return (
+    <div className="flex flex-col items-center w-full max-w-xl mx-auto p-4 sm:p-6 bg-purple-950/70 border border-amber-500/40 rounded-2xl shadow-2xl backdrop-blur-md text-amber-100">
+      {/* Header */}
+      <div className="w-full flex items-center justify-between pb-3 border-b border-amber-500/20 mb-3">
+        <div>
+          <h3 className="text-base sm:text-lg font-bold text-amber-300 font-serif flex items-center gap-1.5">
+            <Search className="w-4 h-4 text-amber-400" />
+            <span>Diwali Palace Treasure Hunt</span>
+          </h3>
+          <p className="text-xs text-amber-200/70">Find all 8 hidden festive treasures in the royal palace!</p>
+        </div>
+
+        {/* Difficulty toggles */}
+        <div className="flex items-center gap-1 p-1 bg-black/40 rounded-xl border border-amber-500/30">
+          {(['easy', 'medium', 'hard'] as const).map((diff) => (
+            <button
+              key={diff}
+              onClick={() => initGame(diff)}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold capitalize transition-all cursor-pointer ${
+                difficulty === diff ? 'bg-amber-400 text-stone-950' : 'text-amber-300/80 hover:text-white'
+              }`}
+            >
+              {diff}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats bar */}
+      <div className="w-full flex items-center justify-between mb-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-amber-300 font-mono font-bold">
+            Found: {foundCount} / {INITIAL_ITEMS.length}
+          </span>
+          {difficulty !== 'hard' && isPlaying && (
+            <button
+              onClick={showNextClue}
+              className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+            >
+              <HelpCircle className="w-3 h-3 text-amber-400" />
+              <span>Clue</span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-black/50 rounded-lg border border-amber-500/30 font-mono text-amber-300 font-bold">
+          <Timer className="w-3.5 h-3.5" />
+          <span className={timeLeft <= 8 ? 'text-rose-400 animate-pulse' : ''}>{timeLeft}s</span>
+        </div>
+      </div>
+
+      {/* Clue notification */}
+      {activeClue && (
+        <div className="w-full p-2 mb-2 rounded-lg bg-amber-500/15 border border-amber-400/40 text-[11px] text-amber-200 text-center animate-pulse">
+          {activeClue}
+        </div>
+      )}
+
+      {/* Virtual Palace Scene Arena */}
+      <div className="relative w-full h-80 sm:h-96 rounded-xl overflow-hidden border-2 border-amber-500/40 select-none shadow-inner touch-manipulation">
+        {/* Palace illustration background */}
+        <img
+          src="/src/assets/images/theme_royal_palace_1794111574329.jpg"
+          alt="Royal Palace Treasure Hunt"
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover filter brightness-75 contrast-110"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+
+        {/* Start Game Overlay */}
+        {!isPlaying && !isWon && !isGameOver && (
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center">
+            <span className="text-5xl mb-2 animate-bounce">ðŸ°</span>
+            <h4 className="text-xl font-bold font-serif text-amber-200">Diwali Royal Treasure Hunt</h4>
+            <p className="text-xs text-amber-200/80 max-w-xs mt-1 leading-relaxed">
+              8 sacred Diwali items are hidden inside the palace. Can you find them all before time runs out?
+            </p>
+            <button
+              onClick={() => initGame(difficulty)}
+              className="mt-5 px-8 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-stone-950 font-bold text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 fill-stone-950" />
+              <span>Begin Exploration</span>
+            </button>
+          </div>
+        )}
+
+        {/* Game Over Screen */}
+        {isGameOver && (
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center">
+            <span className="text-4xl mb-2">â³</span>
+            <h4 className="text-xl font-bold font-serif text-amber-200">Time Expired!</h4>
+            <p className="text-sm text-amber-100/90 mt-1">
+              You discovered <span className="font-bold text-yellow-300">{foundCount}</span> out of 8 hidden treasures.
+            </p>
+            <button
+              onClick={() => initGame(difficulty)}
+              className="mt-4 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-stone-950 font-bold text-xs shadow hover:scale-105 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Try Again</span>
+            </button>
+          </div>
+        )}
+
+        {/* Win Screen with Festive Diwali Blessing Wish (Requested by user) */}
+        {isWon && (
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
+            <Trophy className="w-12 h-12 text-yellow-400 mb-2 animate-bounce" />
+
+            {/* The Festive Diwali Greeting Wish */}
+            <div className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-400/60 shadow-xl max-w-sm mb-3 text-center">
+              <span className="text-xs font-bold text-amber-300 uppercase tracking-widest block mb-1">
+                ðŸ‘‘ Royal Deepavali Blessings! ðŸª”
+              </span>
+              <p className="text-xs sm:text-sm text-amber-100 font-serif leading-relaxed italic">
+                "You have uncovered all 8 sacred treasures of the royal palace! May Goddess Lakshmi bestow divine wisdom, glowing prosperity, and eternal happiness upon you and your loved ones! Shubh Deepavali!"
+              </p>
+            </div>
+
+            <p className="text-sm text-amber-100/90">
+              Discovered all 8 sacred items with{' '}
+              <span className="font-bold text-yellow-300 font-mono">{timeLeft}s</span> remaining!
+            </p>
+
+            <button
+              onClick={() => initGame(difficulty)}
+              className="mt-4 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-stone-950 font-bold text-xs shadow hover:scale-105 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Explore Again</span>
+            </button>
+          </div>
+        )}
+
+        {/* Hidden Items in Palace with Generous Touch Target Hitboxes */}
+        {isPlaying &&
+          items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleItemClick(item.id)}
+              disabled={item.found}
+              style={{
+                position: 'absolute',
+                left: `${item.x}%`,
+                top: `${item.y}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+              className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 select-none ${
+                item.found
+                  ? 'bg-emerald-500/80 ring-2 ring-emerald-300 scale-110 shadow-lg pointer-events-none'
+                  : difficulty === 'easy'
+                  ? 'bg-amber-400/20 ring-2 ring-amber-300/50 animate-pulse hover:scale-125'
+                  : 'bg-black/20 hover:bg-amber-400/30 hover:scale-125'
+              }`}
+              title={item.found ? `${item.name} Found!` : `Tap to discover ${item.name}!`}
+            >
+              <span className="text-2xl sm:text-3xl filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
+                {item.emoji}
+              </span>
+            </button>
+          ))}
+      </div>
+
+      {/* Inventory Bar: Always Visible so player knows what they are seeking */}
+      <div className="w-full mt-3 p-2.5 bg-black/40 rounded-xl border border-amber-500/20">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 block mb-1.5">
+          Sacred Palace Treasures ({foundCount} / {INITIAL_ITEMS.length}):
+        </span>
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className={`flex flex-col items-center justify-center p-1 rounded-lg border text-center transition-all ${
+                item.found
+                  ? 'bg-emerald-950/60 border-emerald-400 text-emerald-300'
+                  : 'bg-purple-950/40 border-amber-500/15 text-stone-500 opacity-60'
+              }`}
+            >
+              <span className="text-lg">{item.emoji}</span>
+              <span className="text-[9px] truncate max-w-full font-medium">{item.name.split(' ')[0]}</span>
+              {item.found && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400 mt-0.5" />}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+========================================
+FILE: src\components\games\FireworkReactionGame.tsx
+========================================
+FILE: src\components\games\RangoliPuzzleGame.tsx
+
+
+import React, { useState } from 'react';
+import { Flame, Sparkles } from 'lucide-react';
+import { festiveAudio } from '../utils/audio';
+
+interface InteractiveDiyaProps {
+  isLit: boolean;
+  onToggleLight: () => void;
+  recipientName?: string;
+}
+
+export const InteractiveDiya: React.FC<InteractiveDiyaProps> = ({
+  isLit,
+  onToggleLight,
+}) => {
+  const [pulseCount, setPulseCount] = useState(0);
+
+  const handleDiyaClick = () => {
+    onToggleLight();
+    setPulseCount((prev) => prev + 1);
+    if (!isLit) {
+      festiveAudio.playDiyaLightSound();
+    } else {
+      festiveAudio.playSparklerSound();
+    }
+  };
+
+  return (
+    <div className="relative flex flex-col items-center justify-center my-6 select-none">
+      {/* Surrounding auspicious mini-diyas in an arc */}
+      <div className="absolute -top-6 w-full max-w-sm flex items-center justify-between px-4 pointer-events-none z-10">
+        {[0, 1, 2, 3, 4].map((index) => {
+          const delay = index * 180;
+          return (
+            <div
+              key={index}
+              className={`flex flex-col items-center transition-all duration-700`}
+              style={{
+                transitionDelay: `${isLit ? delay : 0}ms`,
+                transform: isLit ? 'translateY(0) scale(1)' : 'translateY(8px) scale(0.85)',
+                opacity: isLit ? 1 : 0.45,
+              }}
+            >
+              {/* Flame */}
+              <div
+                className={`w-3.5 h-6 rounded-full bg-gradient-to-t from-orange-600 via-amber-400 to-yellow-100 transition-all duration-500 ${
+                  isLit ? 'animate-flame opacity-100' : 'opacity-0 scale-50'
+                }`}
+                style={{
+                  boxShadow: isLit ? '0 0 14px rgba(251, 191, 36, 0.9), 0 0 25px rgba(234, 88, 12, 0.6)' : 'none',
+                }}
+              />
+              {/* Clay base */}
+              <div className="w-6 h-3 bg-gradient-to-r from-amber-800 via-amber-700 to-amber-900 rounded-b-full border border-amber-500/50 -mt-1 shadow-md" />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Main Central Diya Interactive Container */}
+      <div
+        onClick={handleDiyaClick}
+        className="relative group cursor-pointer p-4 rounded-full transition-transform duration-300 hover:scale-105 active:scale-95"
+        title={isLit ? 'Diya is glowing brightly! Click to enhance glow âœ¨' : 'Click to Light Your Diya ðŸª”'}
+      >
+        {/* Divine radiating golden auras when lit */}
+        {isLit && (
+          <>
+            <div className="absolute inset-0 rounded-full bg-radial from-amber-400/40 via-orange-500/20 to-transparent blur-3xl animate-pulse-glow pointer-events-none" />
+            <div className="absolute -inset-8 rounded-full bg-radial from-yellow-300/25 via-amber-600/15 to-transparent blur-2xl pointer-events-none" />
+          </>
+        )}
+
+        {/* The Diya Vessel with Image & Layered Realistic Flame */}
+        <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-full overflow-hidden border-2 border-amber-400/60 shadow-2xl bg-[#150727] flex items-center justify-center">
+          {/* Terracotta Diya Artwork */}
+          <img
+            src="/src/assets/images/diwali_sacred_diya_1794109042276.jpg"
+            alt="Sacred Diwali Diya Oil Lamp"
+            referrerPolicy="no-referrer"
+            className={`w-full h-full object-cover transition-all duration-1000 ${
+              isLit ? 'brightness-110 contrast-105 filter drop-shadow' : 'brightness-75 contrast-95 opacity-80'
+            }`}
+          />
+
+          {/* Golden border vignette */}
+          <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-amber-300/40 pointer-events-none" />
+
+          {/* Animated Superimposed Pure Flame (Positioned precisely over the wick) */}
+          <div
+            className={`absolute top-[16%] left-[49%] -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-700 ${
+              isLit ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+            }`}
+          >
+            {/* Outer Flame Glow */}
+            <div className="absolute -inset-4 rounded-full bg-radial from-amber-300/80 via-orange-500/40 to-transparent blur-md animate-pulse" />
+
+            {/* Flame Body */}
+            <div
+              className="w-7 h-14 sm:w-8 sm:h-16 rounded-full bg-gradient-to-t from-red-600 via-orange-400 to-amber-100 animate-flame relative z-10"
+              style={{
+                borderRadius: '50% 50% 35% 35% / 80% 80% 20% 20%',
+                boxShadow: '0 0 20px #f59e0b, 0 0 40px #ea580c, 0 0 60px #f97316',
+              }}
+            >
+              {/* Inner White-Hot Core */}
+              <div
+                className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-8 rounded-full bg-white/95 blur-[1px]"
+                style={{
+                  borderRadius: '50% 50% 35% 35% / 80% 80% 20% 20%',
+                }}
+              />
+            </div>
+
+            {/* Rising Sparks from Flame */}
+            {isLit && (
+              <div className="absolute -top-4 w-12 h-12 flex justify-center">
+                <span className="w-1.5 h-1.5 bg-yellow-200 rounded-full animate-ping opacity-75" />
+              </div>
+            )}
+          </div>
+
+          {/* Unlit prompt overlay when dark */}
+          {!isLit && (
+            <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] flex flex-col items-center justify-center p-3 text-center transition-opacity hover:bg-black/30">
+              <Flame className="w-9 h-9 text-amber-400 mb-2 animate-bounce" />
+              <span className="text-xs uppercase tracking-widest text-amber-300 font-semibold drop-shadow">
+                Tap to Light
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Button: "Light Your Diya" */}
+      <div className="mt-4 flex flex-col items-center gap-2">
+        <button
+          onClick={handleDiyaClick}
+          className={`group relative px-6 py-3 rounded-full font-medium text-sm tracking-wide transition-all duration-300 flex items-center gap-2.5 shadow-lg active:scale-95 ${
+            isLit
+              ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 text-stone-950 font-semibold shadow-amber-500/30 ring-2 ring-amber-300/60'
+              : 'bg-gradient-to-r from-purple-950 via-slate-900 to-purple-900 text-amber-300 border border-amber-500/40 hover:border-amber-400 hover:text-amber-200 shadow-purple-950/50'
+          }`}
+        >
+          <Flame
+            className={`w-4 h-4 transition-transform duration-300 group-hover:scale-110 ${
+              isLit ? 'text-amber-950 fill-amber-950 animate-flame' : 'text-amber-400'
+            }`}
+          />
+          <span className="whitespace-nowrap">
+            {isLit ? 'âœ¨ Diya is Glowing Brightly' : 'ðŸª” Light Your Diya'}
+          </span>
+          {isLit && <Sparkles className="w-3.5 h-3.5 text-amber-950 animate-spin" style={{ animationDuration: '4s' }} />}
+        </button>
+
+        <p className="text-xs text-amber-200/70 tracking-wide text-center max-w-xs">
+          {isLit
+            ? 'May the sacred flame illuminate your path with joy, wisdom & eternal light.'
+            : 'Touch the diya or press the button to kindle the sacred light.'}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+========================================
+@import "tailwindcss";
+
+@theme {
+  --font-display: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+  --font-serif-heading: 'Cinzel', Georgia, serif;
+  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
+}
+
+@keyframes flameFlicker {
+  0%, 100% {
+    transform: scale(1) rotate(-1deg);
+    opacity: 0.95;
+    filter: drop-shadow(0 0 16px rgba(251, 146, 60, 0.9)) drop-shadow(0 0 35px rgba(234, 88, 12, 0.6));
+  }
+  25% {
+    transform: scale(1.08, 0.96) rotate(1.5deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 22px rgba(250, 204, 21, 0.95)) drop-shadow(0 0 45px rgba(249, 115, 22, 0.7));
+  }
+  50% {
+    transform: scale(0.95, 1.05) rotate(-2deg);
+    opacity: 0.92;
+    filter: drop-shadow(0 0 18px rgba(251, 146, 60, 0.85)) drop-shadow(0 0 38px rgba(234, 88, 12, 0.65));
+  }
+  75% {
+    transform: scale(1.05, 1.02) rotate(1deg);
+    opacity: 0.98;
+    filter: drop-shadow(0 0 24px rgba(253, 224, 71, 0.95)) drop-shadow(0 0 50px rgba(234, 88, 12, 0.75));
+  }
+}
+
+@keyframes goldShimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes softFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+}
+
+@keyframes rangoliRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.animate-flame {
+  animation: flameFlicker 1.8s ease-in-out infinite alternate;
+  transform-origin: bottom center;
+}
+
+.animate-float-slow {
+  animation: softFloat 6s ease-in-out infinite;
+}
+
+.animate-rangoli-spin {
+  animation: rangoliRotate 90s linear infinite;
+  transform-origin: center center;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3.5s ease-in-out infinite;
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #fff7ed 0%, #fef08a 25%, #fbbf24 50%, #f59e0b 75%, #fde047 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-shimmer-text {
+  background: linear-gradient(90deg, #fef08a 0%, #fbbf24 35%, #ffffff 50%, #f59e0b 65%, #fef08a 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: goldShimmer 4s linear infinite;
+}
+
+.gold-border-glow {
+  box-shadow: 0 0 25px rgba(245, 158, 11, 0.25), inset 0 0 15px rgba(251, 191, 36, 0.15);
+}
+
+.festive-card-glass {
+  background: rgba(18, 7, 34, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+
+
+FILE: src\main.tsx
+
+
