@@ -137,12 +137,9 @@ export const AdminHome: React.FC<AdminHomeProps> = ({ onPreviewCard }) => {
     }
   };
 
-  const getBaseOrigin = () => {
-    if (typeof window !== 'undefined') {
-      return `${window.location.origin}`;
-    }
-    return '';
-  };
+  const getBaseUrl = () => {
+  return `${window.location.origin}/`;
+};
 
   const createWishUrl = (
     name: string,
