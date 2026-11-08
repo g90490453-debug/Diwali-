@@ -138,47 +138,89 @@ export const AdminHome: React.FC<AdminHomeProps> = ({ onPreviewCard }) => {
   };
 
   const getBaseUrl = () => {
-  return `${window.location.origin}/`;
+  return window.location.origin;
 };
 
-  const createWishUrl = (
-    name: string,
-    sender?: string,
-    messageId?: string,
-    customText?: string,
-    designId: DesignThemeId = selectedDesignId,
-    backendId?: string
-  ) => {
-    const origin = getBaseOrigin();
-    const params = new URLSearchParams();
-    params.set('name', name.trim());
-    params.set('theme', designId);
+const createWishUrl = (
+  name: string,
+  sender?: string,
+  messageId?: string,
+  customText?: string,
+  designId: DesignThemeId = selectedDesignId,
+  backendId?: string
+) => {
+  const params = new URLSearchParams();
 
-    if (backendId) {
-      params.set('id', backendId);
-    }
-    if (sender && sender.trim()) {
-      params.set('from', sender.trim());
-    }
-    if (messageId === 'custom' && customText && customText.trim()) {
-      params.set('msg', customText.trim());
-    } else if (messageId && messageId !== 'classic') {
-      const preset = PRESET_MESSAGES.find((p) => p.id === messageId);
-      if (preset) {
-        params.set('msg', preset.text);
-      }
-    }
-    return `${origin}/wish?${params.toString()}`;
-  };
+  params.set('name', name.trim());
+  params.set('theme', designId);
 
+  if (backendId) {
+    params.set('id', backendId);
+  }
+
+  if (sender?.trim()) {
+    params.set('from', sender.trim());
+  }
+
+  let message = '';
+
+  if (messageId === 'custom') {
+    message = customText?.trim() || '';
+  } else {
+    message =
+      PRESET_MESSAGES.find(p => p.id === messageId)?.text ||
+      getThemeById(designId).defaultMessage;
+  }
+
+  if (message) {
+    params.set('msg', message);
+  }
+
+  return `${getBaseUrl()}/wish?${params.toString()}`;
+};
+
+  
   const handleGenerateSingle = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!recipientName.trim()) {
-      setErrorMessage('Please enter the recipient’s name.');
-      return;
+  e?.preventDefault();
+
+  if (!recipientName.trim()) {
+    setErrorMessage("Please enter the recipient's name.");
+    return;
+  }
+
+  setErrorMessage('');
+  setIsGenerating(true);
+
+  try {
+    const url = createWishUrl(
+      recipientName,
+      senderName,
+      selectedMessageId,
+      customMessage,
+      selectedDesignId
+    );
+
+    setGeneratedLink(url);
+
+    saveToHistory(
+      recipientName.trim(),
+      senderName.trim(),
+      url,
+      selectedDesignId
+    );
+
+    try {
+      festiveAudio.playSparklerSound();
+    } catch (audioError) {
+      console.warn('Audio playback unavailable:', audioError);
     }
-    setErrorMessage('');
-    setIsGenerating(true);
+  } catch (error) {
+    console.error('Link generation failed:', error);
+    setErrorMessage('Unable to generate your greeting link. Please try again.');
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
     const activeTheme = getThemeById(selectedDesignId);
     const chosenMsg =
@@ -218,12 +260,60 @@ export const AdminHome: React.FC<AdminHomeProps> = ({ onPreviewCard }) => {
   };
 
   const handleGenerateBatch = async () => {
-    if (!batchNamesInput.trim()) {
-      setErrorMessage('Please enter at least one recipient name.');
-      return;
-    }
-    setErrorMessage('');
-    setIsGenerating(true);
+  if (!batchNamesInput.trim()) {
+    setErrorMessage('Please enter at least one recipient name.');
+    return;
+  }
+
+  setErrorMessage('');
+  setIsGenerating(true);
+
+  try {
+    const names = Array.from(
+      new Set(
+        batchNamesInput
+          .split(/[\n,]/)
+          .map(name => name.trim())
+          .filter(Boolean)
+      )
+    );
+
+    const list = names.map(name => {
+      const url = createWishUrl(
+        name,
+        senderName,
+        selectedMessageId,
+        customMessage,
+        selectedDesignId
+      );
+
+      return {
+        name,
+        url,
+        design: selectedDesignId,
+        copied: false
+      };
+    });
+
+    setBatchGeneratedList(list);
+
+    list.forEach(item => {
+      saveToHistory(
+        item.name,
+        senderName.trim(),
+        item.url,
+        item.design
+      );
+    });
+
+    festiveAudio.playFireworkSound();
+  } catch (error) {
+    console.error('Batch generation failed:', error);
+    setErrorMessage('Unable to generate links. Please try again.');
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
     const rawNames = batchNamesInput
       .split(/[\n,]/)
@@ -269,14 +359,22 @@ export const AdminHome: React.FC<AdminHomeProps> = ({ onPreviewCard }) => {
     festiveAudio.playFireworkSound();
   };
 
-  const copyToClipboard = async (text: string, onDone?: () => void) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      if (onDone) onDone();
-    } catch {
-      if (onDone) onDone();
-    }
-  };
+  const copyToClipboard = async (
+  text: string,
+  onDone?: () => void
+) => {
+  try {
+    await navigator.clipboard.writeText(text);
+
+    if (onDone) onDone();
+    setCopied(true);
+
+    setTimeout(() => setCopied(false), 2000);
+  } catch (error) {
+    console.error('Clipboard error:', error);
+    setErrorMessage('Unable to copy. Please copy the link manually.');
+  }
+};
 
   const shareViaWhatsApp = (name: string, url: string, designId: DesignThemeId = selectedDesignId) => {
     const matchedTheme = getThemeById(designId);
