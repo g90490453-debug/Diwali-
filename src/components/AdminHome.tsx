@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Trash2,
   Loader2,
+  X,
 } from 'lucide-react';
 import { FestiveToran } from './FestiveToran';
 import { DesignSelector } from './DesignSelector';
@@ -104,6 +105,48 @@ export const AdminHome: React.FC<AdminHomeProps> = ({ onPreviewCard }) => {
     }
   }, []);
 
+  const getBaseUrl = () => {
+    return window.location.origin;
+  };
+
+  const createWishUrl = (
+    name: string,
+    sender?: string,
+    messageId?: string,
+    customText?: string,
+    designId: DesignThemeId = selectedDesignId,
+    backendId?: string
+  ) => {
+    const params = new URLSearchParams();
+
+    params.set('name', name.trim());
+    params.set('theme', designId);
+
+    if (backendId) {
+      params.set('id', backendId);
+    }
+
+    if (sender?.trim()) {
+      params.set('from', sender.trim());
+    }
+
+    let message = '';
+
+    if (messageId === 'custom') {
+      message = customText?.trim() || '';
+    } else {
+      message =
+        PRESET_MESSAGES.find((p) => p.id === messageId)?.text ||
+        getThemeById(designId).defaultMessage;
+    }
+
+    if (message) {
+      params.set('msg', message);
+    }
+
+    return `${getBaseUrl()}/wish?${params.toString()}`;
+  };
+
   // Save selected theme to localStorage whenever it changes
   const handleSelectDesign = (newDesignId: DesignThemeId) => {
     setSelectedDesignId(newDesignId);
@@ -137,244 +180,128 @@ export const AdminHome: React.FC<AdminHomeProps> = ({ onPreviewCard }) => {
     }
   };
 
-  const getBaseUrl = () => {
-  return window.location.origin;
-};
-
-const createWishUrl = (
-  name: string,
-  sender?: string,
-  messageId?: string,
-  customText?: string,
-  designId: DesignThemeId = selectedDesignId,
-  backendId?: string
-) => {
-  const params = new URLSearchParams();
-
-  params.set('name', name.trim());
-  params.set('theme', designId);
-
-  if (backendId) {
-    params.set('id', backendId);
-  }
-
-  if (sender?.trim()) {
-    params.set('from', sender.trim());
-  }
-
-  let message = '';
-
-  if (messageId === 'custom') {
-    message = customText?.trim() || '';
-  } else {
-    message =
-      PRESET_MESSAGES.find(p => p.id === messageId)?.text ||
-      getThemeById(designId).defaultMessage;
-  }
-
-  if (message) {
-    params.set('msg', message);
-  }
-
-  return `${getBaseUrl()}/wish?${params.toString()}`;
-};
-
-  
-  const handleGenerateSingle = async (e?: React.FormEvent) => {
-  e?.preventDefault();
-
-  if (!recipientName.trim()) {
-    setErrorMessage("Please enter the recipient's name.");
-    return;
-  }
-
-  setErrorMessage('');
-  setIsGenerating(true);
-
-  try {
-    const url = createWishUrl(
-      recipientName,
-      senderName,
-      selectedMessageId,
-      customMessage,
-      selectedDesignId
-    );
-
-    setGeneratedLink(url);
-
-    saveToHistory(
-      recipientName.trim(),
-      senderName.trim(),
-      url,
-      selectedDesignId
-    );
-
+  const clearHistory = () => {
+    setHistory([]);
     try {
-      festiveAudio.playSparklerSound();
-    } catch (audioError) {
-      console.warn('Audio playback unavailable:', audioError);
-    }
-  } catch (error) {
-    console.error('Link generation failed:', error);
-    setErrorMessage('Unable to generate your greeting link. Please try again.');
-  } finally {
-    setIsGenerating(false);
-  }
-};
-
-    const activeTheme = getThemeById(selectedDesignId);
-    const chosenMsg =
-      selectedMessageId === 'custom' && customMessage.trim()
-        ? customMessage.trim()
-        : PRESET_MESSAGES.find((p) => p.id === selectedMessageId)?.text || activeTheme.defaultMessage;
-
-    let backendWishId: string | undefined = undefined;
-
-    // Register with backend API
-    try {
-      const response = await fetch('/api/wishes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: recipientName.trim(),
-          sender: senderName.trim() || undefined,
-          theme: selectedDesignId,
-          message: chosenMsg,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        backendWishId = data.id;
-      }
+      localStorage.removeItem('diwali_wishes_history');
     } catch {
-      // Fallback works seamlessly via query parameters
+      // ignore
     }
-
-    const url = createWishUrl(recipientName, senderName, selectedMessageId, customMessage, selectedDesignId, backendWishId);
-    setGeneratedLink(url);
-    saveToHistory(recipientName.trim(), senderName.trim(), url, selectedDesignId);
-    setIsGenerating(false);
-
-    festiveAudio.playSparklerSound();
   };
 
-  const handleGenerateBatch = async () => {
-  if (!batchNamesInput.trim()) {
-    setErrorMessage('Please enter at least one recipient name.');
-    return;
-  }
+  const handleGenerateSingle = async (e?: React.FormEvent) => {
+    e?.preventDefault();
 
-  setErrorMessage('');
-  setIsGenerating(true);
+    if (!recipientName.trim()) {
+      setErrorMessage("Please enter the recipient's name.");
+      return;
+    }
 
-  try {
-    const names = Array.from(
-      new Set(
-        batchNamesInput
-          .split(/[\n,]/)
-          .map(name => name.trim())
-          .filter(Boolean)
-      )
-    );
+    setErrorMessage('');
+    setIsGenerating(true);
 
-    const list = names.map(name => {
+    try {
       const url = createWishUrl(
-        name,
+        recipientName,
         senderName,
         selectedMessageId,
         customMessage,
         selectedDesignId
       );
 
-      return {
-        name,
-        url,
-        design: selectedDesignId,
-        copied: false
-      };
-    });
+      setGeneratedLink(url);
 
-    setBatchGeneratedList(list);
-
-    list.forEach(item => {
       saveToHistory(
-        item.name,
+        recipientName.trim(),
         senderName.trim(),
-        item.url,
-        item.design
-      );
-    });
-
-    festiveAudio.playFireworkSound();
-  } catch (error) {
-    console.error('Batch generation failed:', error);
-    setErrorMessage('Unable to generate links. Please try again.');
-  } finally {
-    setIsGenerating(false);
-  }
-};
-
-    const rawNames = batchNamesInput
-      .split(/[\n,]/)
-      .map((n) => n.trim())
-      .filter((n) => n.length > 0);
-
-    const uniqueNames = Array.from(new Set(rawNames));
-
-    const list: Array<{ name: string; url: string; design: DesignThemeId; copied: boolean }> = [];
-
-    for (const name of uniqueNames) {
-      let backendWishId: string | undefined = undefined;
-      try {
-        const response = await fetch('/api/wishes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name,
-            sender: senderName.trim() || undefined,
-            theme: selectedDesignId,
-          }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          backendWishId = data.id;
-        }
-      } catch {
-        // ignore
-      }
-
-      const url = createWishUrl(name, senderName, selectedMessageId, customMessage, selectedDesignId, backendWishId);
-      saveToHistory(name, senderName.trim(), url, selectedDesignId);
-      list.push({
-        name,
         url,
-        design: selectedDesignId,
-        copied: false,
-      });
-    }
+        selectedDesignId
+      );
 
-    setBatchGeneratedList(list);
-    setIsGenerating(false);
-    festiveAudio.playFireworkSound();
+      try {
+        festiveAudio.playSparklerSound();
+      } catch (audioError) {
+        console.warn('Audio playback unavailable:', audioError);
+      }
+    } catch (error) {
+      console.error('Link generation failed:', error);
+      setErrorMessage('Unable to generate your greeting link. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const copyToClipboard = async (
-  text: string,
-  onDone?: () => void
-) => {
-  try {
-    await navigator.clipboard.writeText(text);
+  const handleGenerateBatch = async () => {
+    if (!batchNamesInput.trim()) {
+      setErrorMessage('Please enter at least one recipient name.');
+      return;
+    }
 
-    if (onDone) onDone();
-    setCopied(true);
+    setErrorMessage('');
+    setIsGenerating(true);
 
-    setTimeout(() => setCopied(false), 2000);
-  } catch (error) {
-    console.error('Clipboard error:', error);
-    setErrorMessage('Unable to copy. Please copy the link manually.');
-  }
-};
+    try {
+      const names = Array.from(
+        new Set(
+          batchNamesInput
+            .split(/[\n,]/)
+            .map((name) => name.trim())
+            .filter(Boolean)
+        )
+      );
+
+      const list = names.map((name) => {
+        const url = createWishUrl(
+          name,
+          senderName,
+          selectedMessageId,
+          customMessage,
+          selectedDesignId
+        );
+
+        return {
+          name,
+          url,
+          design: selectedDesignId,
+          copied: false,
+        };
+      });
+
+      setBatchGeneratedList(list);
+
+      list.forEach((item) => {
+        saveToHistory(
+          item.name,
+          senderName.trim(),
+          item.url,
+          item.design
+        );
+      });
+
+      try {
+        festiveAudio.playFireworkSound();
+      } catch (audioError) {
+        console.warn('Audio playback unavailable:', audioError);
+      }
+    } catch (error) {
+      console.error('Batch generation failed:', error);
+      setErrorMessage('Unable to generate links. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string, onDone?: () => void) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (onDone) onDone();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Clipboard error:', error);
+      setErrorMessage('Unable to copy. Please copy the link manually.');
+    }
+  };
 
   const shareViaWhatsApp = (name: string, url: string, designId: DesignThemeId = selectedDesignId) => {
     const matchedTheme = getThemeById(designId);
@@ -591,309 +518,10 @@ const createWishUrl = (
                   {isGenerating ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-stone-950" />
-                      <span>Generating Personalised Link...</span>
+                      <span>Creating Festive Greeting...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 fill-stone-950" />
-                      <span>
-                        {mode === 'single' ? `Generate ${activeTheme.name} Wish Link ✨` : 'Generate All Wish Links ✨'}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Right Column: Live Card Preview & Share Hub */}
-            <div className="lg:col-span-5 flex flex-col items-center">
-              <div className="w-full text-left mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-amber-300">
-                  Immediate Card Preview
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onPreviewCard(
-                      recipientName.trim() || 'Rahul',
-                      senderName.trim() || undefined,
-                      currentMessageText,
-                      selectedDesignId
-                    )
-                  }
-                  className="text-xs text-amber-400 hover:text-amber-200 flex items-center gap-1 font-medium cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Full Screen Preview</span>
-                </button>
-              </div>
-
-              {/* Dynamic Theme Preview Card that updates IMMEDIATELY when theme or inputs change */}
-              <div className="w-full rounded-2xl border border-amber-500/40 shadow-inner relative overflow-hidden flex flex-col items-center text-center">
-                {/* Background image preview */}
-                <div className="relative w-full h-36 overflow-hidden">
-                  <img
-                    src={activeTheme.thumbnail}
-                    alt={activeTheme.name}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover filter brightness-90 transition-all duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0e041c] via-[#0e041c]/40 to-transparent" />
-                  <div className="absolute top-2 left-3 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[10px] text-amber-300 border border-amber-400/30">
-                    Theme: {activeTheme.name}
-                  </div>
-                  <div className="absolute top-2 right-3 text-lg">
-                    {activeTheme.particles[0]}
-                  </div>
-                </div>
-
-                <div className="p-4 w-full bg-[#0e041c] flex flex-col items-center">
-                  <div
-                    className="text-amber-300 text-lg sm:text-xl font-bold tracking-tight gold-gradient-text"
-                    style={{ fontFamily: activeTheme.fontStyle }}
-                  >
-                    Happy Diwali, {recipientName.trim() || 'Rahul'}! 🪔
-                  </div>
-
-                  {senderName.trim() && (
-                    <p className="text-[11px] text-amber-300/80 mt-0.5">From {senderName.trim()}</p>
-                  )}
-
-                  <p className="text-xs text-amber-100/90 italic font-sans leading-relaxed line-clamp-3 px-2 mt-2">
-                    "{currentMessageText}"
-                  </p>
-
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      Interactive Diya
-                    </span>
-                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      Fireworks
-                    </span>
-                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      10 Games
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Generated Single Link Box */}
-              {generatedLink && mode === 'single' && (
-                <div className="w-full mt-5 p-4 rounded-xl bg-purple-950/60 border border-amber-400/50 shadow-xl space-y-3 animate-fadeIn">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      Link Generated for {recipientName}!
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowQR(!showQR)}
-                      className="text-[11px] text-amber-400 hover:text-amber-200 flex items-center gap-1 font-medium cursor-pointer"
-                    >
-                      <QrCode className="w-3.5 h-3.5" />
-                      <span>{showQR ? 'Hide QR' : 'Show QR'}</span>
-                    </button>
-                  </div>
-
-                  {/* URL Text Container */}
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-[#0a0214] border border-amber-500/30">
-                    <input
-                      type="text"
-                      readOnly
-                      value={generatedLink}
-                      className="w-full bg-transparent text-xs text-amber-200 truncate focus:outline-none select-all font-mono"
-                    />
-                  </div>
-
-                  {/* Actions: Copy Link & WhatsApp Share */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyToClipboard(generatedLink, () => {
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                        })
-                      }
-                      className="w-full py-2.5 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-300">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Copy Link</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => shareViaWhatsApp(recipientName, generatedLink, selectedDesignId)}
-                      className="w-full py-2.5 px-3 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>WhatsApp</span>
-                    </button>
-                  </div>
-
-                  {/* QR Code view */}
-                  {showQR && (
-                    <div className="pt-2 flex flex-col items-center animate-fadeIn">
-                      <div className="p-3 bg-white rounded-xl shadow-lg">
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                            generatedLink
-                          )}`}
-                          alt="Diwali Wish QR Code"
-                          className="w-32 h-32"
-                        />
-                      </div>
-                      <span className="text-[11px] text-amber-300/70 mt-1">Scan with phone to open greeting</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Batch Generated Links Table */}
-          {mode === 'batch' && batchGeneratedList.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-amber-500/20 animate-fadeIn">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-amber-200">
-                  Generated Links ({batchGeneratedList.length} Recipients · {activeTheme.name})
-                </h3>
-                <span className="text-xs text-amber-400/80">1-click WhatsApp or Copy for each</span>
-              </div>
-
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {batchGeneratedList.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-purple-950/40 border border-amber-500/20 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="truncate min-w-0">
-                      <span className="font-semibold text-amber-200">{item.name}</span>
-                      <p className="text-[11px] text-amber-400/60 truncate">{item.url}</p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyToClipboard(item.url, () => {
-                            const updated = [...batchGeneratedList];
-                            updated[idx].copied = true;
-                            setBatchGeneratedList(updated);
-                            setTimeout(() => {
-                              const reset = [...batchGeneratedList];
-                              if (reset[idx]) reset[idx].copied = false;
-                              setBatchGeneratedList(reset);
-                            }, 2000);
-                          })
-                        }
-                        className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium cursor-pointer"
-                      >
-                        {item.copied ? 'Copied' : 'Copy'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => shareViaWhatsApp(item.name, item.url, item.design)}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white font-medium flex items-center gap-1 cursor-pointer"
-                      >
-                        <Send className="w-3 h-3" />
-                        <span>Share</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* Recently Generated History with Design Badges */}
-        {history.length > 0 && (
-          <div className="mt-10 p-5 rounded-2xl festive-card-glass border border-amber-500/30">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Recently Created Greetings</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setHistory([]);
-                  localStorage.removeItem('diwali_wishes_history');
-                }}
-                className="text-[11px] text-amber-400/60 hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>Clear History</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {history.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 rounded-xl bg-[#0d0319] border border-amber-500/20 flex flex-col justify-between gap-2"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-amber-200 truncate">{item.name}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 capitalize border border-amber-500/25">
-                        {item.design || 'royal'}
-                      </span>
-                    </div>
-                    {item.sender && (
-                      <p className="text-[11px] text-amber-300/70">From {item.sender}</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1 border-t border-amber-500/10">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyToClipboard(item.url, () => {
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                        })
-                      }
-                      className="flex-1 py-1 px-2 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] text-center cursor-pointer"
-                    >
-                      Copy Link
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => shareViaWhatsApp(item.name, item.url, item.design || 'royal')}
-                      className="p-1.5 rounded bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 cursor-pointer"
-                      title="Share to WhatsApp"
-                    >
-                      <Send className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 4. Diwali Fun Zone Section (10 Games) */}
-        <div className="mt-12">
-          <DiwaliFunZone />
-        </div>
-
-        {/* 5. About Diwali Cultural Section */}
-        <div className="mt-8">
-          <AboutDiwali />
-        </div>
-      </main>
-    </div>
-  );
-};
+                      <Sparkles className="w-4 h-4 text-stone-950" />
+                      <span>{mode === 'single' ? 'Generate Greeting Link' : 'Generate Batch Links'}</span>
+                    <
