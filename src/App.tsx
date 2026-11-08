@@ -39,25 +39,15 @@ export default function App() {
 
         // Immediate direct extraction from URL parameters (instant 0ms render)
         if (nameParam && nameParam.trim()) {
-          try {
-            setRecipientName(decodeURIComponent(nameParam.trim()));
-          } catch {
-            setRecipientName(nameParam.trim());
-          }
+          setRecipientName(nameParam.trim());
+        } else {
+          setRecipientName('Dearest Friend');
         }
         if (fromParam && fromParam.trim()) {
-          try {
-            setSenderName(decodeURIComponent(fromParam.trim()));
-          } catch {
-            setSenderName(fromParam.trim());
-          }
+          setSenderName(fromParam.trim());
         }
         if (msgParam && msgParam.trim()) {
-          try {
-            setMessage(decodeURIComponent(msgParam.trim()));
-          } catch {
-            setMessage(msgParam.trim());
-          }
+          setMessage(msgParam.trim());
         }
         if (themeParam) {
           setDesignId(getThemeById(themeParam).id);

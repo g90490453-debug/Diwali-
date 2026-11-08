@@ -51,9 +51,14 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const greetingUrl =
     currentUrl ||
     (typeof window !== 'undefined'
-      ? `${window.location.origin}/wish?name=${encodeURIComponent(
-          recipientName
-        )}&theme=${theme.id}${senderName ? `&from=${encodeURIComponent(senderName)}` : ''}`
+      ? (() => {
+          const params = new URLSearchParams();
+          params.set('name', recipientName);
+          params.set('theme', theme.id);
+          if (senderName && senderName.trim()) params.set('from', senderName.trim());
+          if (customMessage && customMessage.trim()) params.set('msg', customMessage.trim());
+          return `${window.location.origin}/wish?${params.toString()}`;
+        })()
       : '');
 
   const messageText = customMessage?.trim() || theme.defaultMessage;
@@ -111,14 +116,40 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   };
 
   const handleCopy = async () => {
+    let success = false;
     try {
-      await navigator.clipboard.writeText(greetingUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(greetingUrl);
+        success = true;
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = greetingUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
     } catch {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = greetingUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch {
+        success = false;
+      }
     }
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleWhatsApp = () => {
