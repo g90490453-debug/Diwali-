@@ -3,7 +3,7 @@ import { AdminHome } from './components/AdminHome';
 import { DesignCard } from './components/DesignCard';
 import { Navbar } from './components/Navbar';
 import { DiwaliFunZone } from './components/games/DiwaliFunZone';
-import { DesignThemeId, DIWALI_DESIGNS, getThemeById } from './types/theme';
+import { DesignThemeId, getThemeById } from './types/theme';
 
 export default function App() {
   const [view, setView] = useState<'home' | 'card'>('home');
@@ -13,7 +13,6 @@ export default function App() {
   const [message, setMessage] = useState<string | undefined>(undefined);
   const [designId, setDesignId] = useState<DesignThemeId>('royal');
   const [showFunZone, setShowFunZone] = useState(false);
-  const [isLoadingWish, setIsLoadingWish] = useState(false);
 
   // Initialize and parse route on mount
   useEffect(() => {
@@ -22,55 +21,67 @@ export default function App() {
     const parseRoute = async () => {
       const pathname = window.location.pathname;
       const params = new URLSearchParams(window.location.search);
-      const isWishPath = pathname.startsWith('/wish') || params.has('id') || params.has('name');
+      const isWishPath =
+        pathname.startsWith('/wish') ||
+        params.has('name') ||
+        params.has('recipient') ||
+        params.has('id');
 
       if (isWishPath) {
         setIsRecipient(true);
         setView('card');
 
         const wishId = params.get('id');
-        const nameParam = params.get('name');
+        const nameParam = params.get('name') || params.get('recipient');
         const themeParam = params.get('theme') || params.get('design');
-        const fromParam = params.get('from');
-        const msgParam = params.get('msg');
+        const fromParam = params.get('from') || params.get('sender');
+        const msgParam = params.get('msg') || params.get('message');
 
-        // If backend wish ID is provided, fetch exact record
-        if (wishId) {
-          setIsLoadingWish(true);
+        // Immediate direct extraction from URL parameters (instant 0ms render)
+        if (nameParam && nameParam.trim()) {
+          try {
+            setRecipientName(decodeURIComponent(nameParam.trim()));
+          } catch {
+            setRecipientName(nameParam.trim());
+          }
+        }
+        if (fromParam && fromParam.trim()) {
+          try {
+            setSenderName(decodeURIComponent(fromParam.trim()));
+          } catch {
+            setSenderName(fromParam.trim());
+          }
+        }
+        if (msgParam && msgParam.trim()) {
+          try {
+            setMessage(decodeURIComponent(msgParam.trim()));
+          } catch {
+            setMessage(msgParam.trim());
+          }
+        }
+        if (themeParam) {
+          setDesignId(getThemeById(themeParam).id);
+        }
+
+        // Backward compatibility: If an old link has ONLY an ID and NO name query param, attempt fetch
+        if (wishId && (!nameParam || !nameParam.trim())) {
           try {
             const res = await fetch(`/api/wishes/${encodeURIComponent(wishId)}`, {
               headers: { 'X-Recipient-View': 'true' },
             });
             if (res.ok) {
               const data = await res.json();
-              setRecipientName(data.name || nameParam || 'Friend');
-              setSenderName(data.sender || fromParam || undefined);
-              setMessage(data.message || msgParam || undefined);
-              setDesignId(getThemeById(data.theme).id);
-              setIsLoadingWish(false);
-              return;
+              if (data.name) setRecipientName(data.name);
+              if (data.sender) setSenderName(data.sender);
+              if (data.message) setMessage(data.message);
+              if (data.theme) setDesignId(getThemeById(data.theme).id);
             }
           } catch {
-            // fallback to URL parameters below
+            // Ignore - default parameters already in place
           }
-          setIsLoadingWish(false);
-        }
-
-        // Direct URL parameter fallback
-        if (nameParam && nameParam.trim()) {
-          setRecipientName(nameParam.trim());
-        }
-        if (fromParam && fromParam.trim()) {
-          setSenderName(fromParam.trim());
-        }
-        if (msgParam && msgParam.trim()) {
-          setMessage(msgParam.trim());
-        }
-        if (themeParam) {
-          setDesignId(getThemeById(themeParam).id);
         }
       } else {
-        // Sender mode
+        // Sender dashboard mode
         setIsRecipient(false);
         setView('home');
       }
@@ -94,14 +105,14 @@ export default function App() {
     setSenderName(sender);
     setMessage(msgText);
     setDesignId(getThemeById(theme).id);
-    setIsRecipient(false); // sender preview
+    setIsRecipient(false); // sender preview mode
     setView('card');
     setShowFunZone(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleReturnToStudio = () => {
-    if (isRecipient) return; // Recipient is view-only, cannot navigate to studio
+    if (isRecipient) return; // View-only security: Recipient cannot navigate to studio
     setView('home');
     setShowFunZone(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -161,7 +172,7 @@ export default function App() {
             May millions of sacred diyas illuminate your home with peace, health & prosperity.
           </p>
 
-          <div className="text-[11px] text-amber-300/80">
+          <div className="text-[11px] text-amber-300/80 font-mono">
             Shubh Deepavali ✨ 2026
           </div>
         </div>

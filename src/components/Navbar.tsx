@@ -70,7 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPreview, onGoHome, isCardV
             <>
               <button
                 type="button"
-                onClick={() => handleScrollTo('create-wishes')}
+                onClick={() => handleScrollTo('generate-section')}
                 className="hover:text-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <PenTool className="w-3.5 h-3.5 text-amber-400" />
@@ -169,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPreview, onGoHome, isCardV
             <>
               <button
                 type="button"
-                onClick={() => handleScrollTo('create-wishes')}
+                onClick={() => handleScrollTo('generate-section')}
                 className="w-full p-2.5 rounded-lg bg-black/30 text-left flex items-center gap-2"
               >
                 <PenTool className="w-3.5 h-3.5 text-amber-400" />
